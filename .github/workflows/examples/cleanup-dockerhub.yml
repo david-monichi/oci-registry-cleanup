@@ -1,0 +1,23 @@
+name: Cleanup Docker Hub
+
+on:
+  schedule:
+    - cron: '0 1 * * 0'  # Weekly on Sunday at 1 AM UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup-dockerhub:
+    runs-on: ubuntu-latest
+    name: Cleanup Docker Hub Images
+    
+    steps:
+      - name: Cleanup old development tags
+        uses: your-username/oci-registry-cleanup@v1
+        with:
+          registry-url: registry.hub.docker.com/${{ secrets.DOCKERHUB_USERNAME }}
+          registry-username: ${{ secrets.DOCKERHUB_USERNAME }}
+          registry-password: ${{ secrets.DOCKERHUB_TOKEN }}
+          tag-filter: '^(dev|nightly)-.*'
+          retention-days: '21'
+          dry-run: 'false'
+          log-level: 'INFO'

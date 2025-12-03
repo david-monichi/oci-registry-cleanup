@@ -1,0 +1,65 @@
+name: Cleanup GitHub Container Registry
+
+on:
+  # Run daily at 2 AM UTC
+  schedule:
+    - cron: '0 2 * * *'
+  
+  # Allow manual trigger
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run mode'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      retention_days:
+        description: 'Retention period in days'
+        required: false
+        default: '30'
+        type: string
+
+jobs:
+  cleanup-registry:
+    runs-on: ubuntu-latest
+    name: Cleanup Old Images
+    
+    steps:
+      - name: Cleanup development images
+        uses: your-username/oci-registry-cleanup@v1
+        with:
+          registry-url: ghcr.io/${{ github.repository_owner }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          # Clean up dev and feature branch images
+          tag-filter: '^(dev|feature|test)-.*'
+          retention-days: ${{ github.event.inputs.retention_days || '14' }}
+          dry-run: ${{ github.event.inputs.dry_run || 'false' }}
+          log-level: 'INFO'
+      
+      - name: Cleanup snapshot releases
+        uses: your-username/oci-registry-cleanup@v1
+        with:
+          registry-url: ghcr.io/${{ github.repository_owner }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          # Clean up snapshot tags older than 7 days
+          tag-filter: '.*-snapshot$'
+          retention-days: '7'
+          dry-run: ${{ github.event.inputs.dry_run || 'false' }}
+          log-level: 'INFO'
+      
+      - name: Cleanup PR images
+        uses: your-username/oci-registry-cleanup@v1
+        with:
+          registry-url: ghcr.io/${{ github.repository_owner }}
+          registry-username: ${{ github.actor }}
+          registry-password: ${{ secrets.GITHUB_TOKEN }}
+          # Clean up pull request images older than 30 days
+          tag-filter: '^pr-[0-9]+'
+          retention-days: '30'
+          dry-run: ${{ github.event.inputs.dry_run || 'false' }}
+          log-level: 'INFO'

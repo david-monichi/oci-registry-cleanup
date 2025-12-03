@@ -1,0 +1,38 @@
+name: Cleanup Azure Container Registry
+
+on:
+  schedule:
+    - cron: '0 3 * * *'  # Daily at 3 AM UTC
+  workflow_dispatch:
+
+jobs:
+  cleanup-acr:
+    runs-on: ubuntu-latest
+    name: Cleanup ACR Images
+    
+    steps:
+      - name: Cleanup specific services
+        uses: your-username/oci-registry-cleanup@v1
+        with:
+          registry-url: ${{ secrets.ACR_REGISTRY_URL }}
+          registry-username: ${{ secrets.ACR_USERNAME }}
+          registry-password: ${{ secrets.ACR_PASSWORD }}
+          # Only cleanup specific microservices
+          artifact-filter: 'backend-api,worker-service,notification-service'
+          # Only cleanup master branch builds older than 60 days
+          tag-filter: '^master-.*'
+          retention-days: '60'
+          dry-run: 'false'
+          log-level: 'INFO'
+      
+      - name: Cleanup all old snapshots
+        uses: your-username/oci-registry-cleanup@v1
+        with:
+          registry-url: ${{ secrets.ACR_REGISTRY_URL }}
+          registry-username: ${{ secrets.ACR_USERNAME }}
+          registry-password: ${{ secrets.ACR_PASSWORD }}
+          # Clean up snapshot builds from all services
+          tag-filter: '.*-SNAPSHOT$'
+          retention-days: '7'
+          dry-run: 'false'
+          log-level: 'INFO'

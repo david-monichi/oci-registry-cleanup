@@ -1,0 +1,96 @@
+name: 'OCI Registry Cleanup'
+description: 'Clean up old OCI artifacts from container registries based on age and filters'
+author: 'David Monichi <david@monichi.com>'
+
+branding:
+  icon: 'trash-2'
+  color: 'red'
+
+inputs:
+  registry-url:
+    description: 'OCI registry URL (without protocol, e.g., ghcr.io, registry.example.com)'
+    required: true
+  registry-username:
+    description: 'Username for registry authentication'
+    required: true
+  registry-password:
+    description: 'Password or token for registry authentication'
+    required: true
+  artifact-filter:
+    description: 'Comma-separated list of repository prefixes (e.g., "backend-api,worker") or regex pattern. Leave empty to process all artifacts'
+    required: false
+    default: ''
+  tag-filter:
+    description: 'Regex pattern to match image tags (e.g., "^master-.*" or ".*-snapshot$"). Leave empty to process all tags'
+    required: false
+    default: ''
+  retention-days:
+    description: 'Delete artifacts older than this many days'
+    required: false
+    default: '30'
+  dry-run:
+    description: 'Set to "true" to preview deletions without executing them'
+    required: false
+    default: 'false'
+  log-level:
+    description: 'Logging verbosity: DEBUG, INFO, WARN, ERROR'
+    required: false
+    default: 'INFO'
+
+outputs:
+  repositories-processed:
+    description: 'Number of repositories processed'
+  artifacts-scanned:
+    description: 'Total number of artifacts scanned'
+  artifacts-deleted:
+    description: 'Number of artifacts deleted'
+  artifacts-skipped:
+    description: 'Number of artifacts skipped (no creation date)'
+  errors-encountered:
+    description: 'Number of errors encountered'
+
+runs:
+  using: 'composite'
+  steps:
+    - name: Install dependencies
+      shell: bash
+      run: |
+        if ! command -v jq &> /dev/null; then
+          if [[ "$RUNNER_OS" == "Linux" ]]; then
+            sudo apt-get update && sudo apt-get install -y jq
+          elif [[ "$RUNNER_OS" == "macOS" ]]; then
+            brew install jq
+          fi
+        fi
+        
+    - name: Run OCI Registry Cleanup
+      shell: bash
+      env:
+        REGISTRY_URL: ${{ inputs.registry-url }}
+        REGISTRY_USERNAME: ${{ inputs.registry-username }}
+        REGISTRY_PASSWORD: ${{ inputs.registry-password }}
+        ARTIFACT_FILTER: ${{ inputs.artifact-filter }}
+        TAG_FILTER: ${{ inputs.tag-filter }}
+        RETENTION_DAYS: ${{ inputs.retention-days }}
+        DRY_RUN: ${{ inputs.dry-run }}
+        LOG_LEVEL: ${{ inputs.log-level }}
+      run: |
+        "${{ github.action_path }}/cleanup-oci-artifacts.sh" 2>&1 | tee cleanup-output.log
+        
+    - name: Parse output and set outputs
+      shell: bash
+      if: always()
+      run: |
+        if [[ -f cleanup-output.log ]]; then
+          repos=$(grep "Repositories processed:" cleanup-output.log | grep -oE '[0-9]+' | tail -1 || echo "0")
+          scanned=$(grep "Total artifacts scanned:" cleanup-output.log | grep -oE '[0-9]+' | tail -1 || echo "0")
+          deleted=$(grep "Artifacts deleted:" cleanup-output.log | grep -oE '[0-9]+' | tail -1 || echo "0")
+          skipped=$(grep "Artifacts skipped" cleanup-output.log | grep -oE '[0-9]+' | tail -1 || echo "0")
+          errors=$(grep "Errors encountered:" cleanup-output.log | grep -oE '[0-9]+' | tail -1 || echo "0")
+          
+          echo "repositories-processed=$repos" >> $GITHUB_OUTPUT
+          echo "artifacts-scanned=$scanned" >> $GITHUB_OUTPUT
+          echo "artifacts-deleted=$deleted" >> $GITHUB_OUTPUT
+          echo "artifacts-skipped=$skipped" >> $GITHUB_OUTPUT
+          echo "errors-encountered=$errors" >> $GITHUB_OUTPUT
+        fi

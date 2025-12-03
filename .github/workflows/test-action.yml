@@ -1,0 +1,56 @@
+name: Test OCI Registry Cleanup Action
+
+on:
+  push:
+    branches:
+      - main
+      - master
+  pull_request:
+  workflow_dispatch:
+    inputs:
+      dry-run:
+        description: 'Dry run mode'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      retention-days:
+        description: 'Retention period in days'
+        required: false
+        default: '30'
+        type: string
+
+jobs:
+  test-action:
+    runs-on: ubuntu-latest
+    name: Test Cleanup Action
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Run OCI Registry Cleanup
+        id: cleanup
+        uses: ./
+        with:
+          registry-url: ${{ secrets.TEST_REGISTRY_URL || 'ghcr.io/test' }}
+          registry-username: ${{ secrets.TEST_REGISTRY_USERNAME || 'test' }}
+          registry-password: ${{ secrets.TEST_REGISTRY_PASSWORD || 'test' }}
+          artifact-filter: 'test-service,demo-app'
+          tag-filter: '^dev-.*'
+          retention-days: ${{ github.event.inputs.retention-days || '30' }}
+          dry-run: ${{ github.event.inputs.dry-run || 'true' }}
+          log-level: 'DEBUG'
+      
+      - name: Display results
+        if: always()
+        run: |
+          echo "### Cleanup Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Repositories Processed:** ${{ steps.cleanup.outputs.repositories-processed }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifacts Scanned:** ${{ steps.cleanup.outputs.artifacts-scanned }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifacts Deleted:** ${{ steps.cleanup.outputs.artifacts-deleted }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Artifacts Skipped:** ${{ steps.cleanup.outputs.artifacts-skipped }}" >> $GITHUB_STEP_SUMMARY
+          echo "- **Errors Encountered:** ${{ steps.cleanup.outputs.errors-encountered }}" >> $GITHUB_STEP_SUMMARY
