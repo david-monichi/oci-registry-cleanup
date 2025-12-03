@@ -1,13 +1,33 @@
 name: Test OCI Registry Cleanup Action
 
 on:
-  push:
-    branches:
-      - main
-      - master
-  pull_request:
   workflow_dispatch:
     inputs:
+      registry-url:
+        description: 'Registry URL'
+        required: true
+        default: 'ghcr.io/test'
+        type: string
+      registry-username:
+        description: 'Registry username'
+        required: true
+        default: '<username>'
+        type: string
+      registry-password:
+        description: 'Registry password'
+        required: true
+        default: '<password>'
+        type: string
+      artifact-filter:
+        description: 'Artifact filter regex'
+        required: false
+        default: 'all'
+        type: string
+      tag-filter:
+        description: 'Tag filter regex'
+        required: false
+        default: 'all'
+        type: string
       dry-run:
         description: 'Dry run mode'
         required: false
@@ -26,22 +46,19 @@ jobs:
   test-action:
     runs-on: ubuntu-latest
     name: Test Cleanup Action
-    
+
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-      
       - name: Run OCI Registry Cleanup
         id: cleanup
-        uses: ./
+        uses: david-monichi/oci-registry-cleanup
         with:
-          registry-url: ${{ secrets.TEST_REGISTRY_URL || 'ghcr.io/test' }}
-          registry-username: ${{ secrets.TEST_REGISTRY_USERNAME || 'test' }}
-          registry-password: ${{ secrets.TEST_REGISTRY_PASSWORD || 'test' }}
-          artifact-filter: 'test-service,demo-app'
-          tag-filter: '^dev-.*'
-          retention-days: ${{ github.event.inputs.retention-days || '30' }}
-          dry-run: ${{ github.event.inputs.dry-run || 'true' }}
+          registry-url: ${{ github.event.inputs.registry-url }}
+          registry-username: ${{ github.event.inputs.registry-username }}
+          registry-password: ${{ github.event.inputs.registry-password }}
+          artifact-filter: ${{ github.event.inputs.artifact-filter }}
+          tag-filter: ${{ github.event.inputs.tag-filter }}
+          retention-days: ${{ github.event.inputs.retention-days }}
+          dry-run: ${{ github.event.inputs.dry-run }}
           log-level: 'DEBUG'
       
       - name: Display results
